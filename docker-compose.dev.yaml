@@ -1,0 +1,26 @@
+
+
+
+
+services:
+  backend:
+    image: backend:dev
+
+    ports:
+      - "8080:8080"   # host:container
+    volumes:
+      - $APPS_DIRECTORY/backend/cmd:/app/cmd
+      - $APPS_DIRECTORY/backend/internal:/app/internal
+      - $APPS_DIRECTORY/backend/.air.toml:/app/.air.toml
+      - $APPS_DIRECTORY/backend/go.mod:/app/go.mod
+      - $APPS_DIRECTORY/backend/go.sum:/app/go.sum
+
+      # Speed up builds by caching module & build caches on the host:
+      - $APPS_DIRECTORY/backend/.cache/go-mod-cache:/go/pkg/mod
+      - $APPS_DIRECTORY/backend/.cache/go-build-cache:/root/.cache/go-build
+      - $APPS_DIRECTORY/backend/.cache/air:/app/air
+   
+      - $APPS_DIRECTORY/backend/firebase_sa.json:/app/firebase_sa.json
+
+    command: ["air", "-c", ".air.toml"]
+

@@ -1,0 +1,21 @@
+.cache
+firebase_sa.json
+
+/bin/
+/out/
+/dist/
+.DS_Store
+*.log
+.env
+firebase-sa.json
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

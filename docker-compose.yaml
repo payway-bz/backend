@@ -1,0 +1,23 @@
+
+
+
+
+
+
+services:
+  backend:
+    image: backend:prod
+    container_name: backend
+
+    # Color configuration
+    tty: true           # allocate a TTY (critical for colors)
+    environment:
+      TERM: xterm-256color    
+      DATABASE_URL: postgres://admin:password@database:5432/main
+      FIREBASE_CREDENTIALS_FILE: /app/firebase_sa.json
+    
+    networks: [appnet]
+
+networks:
+  appnet:
+    driver: bridge
