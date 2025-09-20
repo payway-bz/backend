@@ -9,6 +9,9 @@ services:
     image: backend:prod
     container_name: backend
 
+    ports:
+      - "8080:8080"
+      
     # Color configuration
     tty: true           # allocate a TTY (critical for colors)
     environment:
@@ -17,6 +20,9 @@ services:
       FIREBASE_CREDENTIALS_FILE: /app/firebase_sa.json
     
     networks: [appnet]
+
+    volumes:
+      - $APPS_DIRECTORY/backend/firebase_sa.json:/app/firebase_sa.json
 
 networks:
   appnet:

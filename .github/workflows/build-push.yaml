@@ -55,7 +55,7 @@ jobs:
 
       - name: Push docker image
         working-directory: ${{ env.APP_DIR }}
-        run: ../../helpers/docker-push --dev -t ${{ steps.tag.outputs.IMAGE_TAG }}
+        run: ../../helpers/docker-push -t ${{ steps.tag.outputs.IMAGE_TAG }}
 
   # deploy:
   #   runs-on: ubuntu-latest

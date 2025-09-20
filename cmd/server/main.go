@@ -3,11 +3,13 @@ package main
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
 	"time"
 
+	"github.com/cenkalti/backoff/v4"
 	_ "github.com/jackc/pgx/v5/stdlib"
 
 	"backend/internal"
@@ -31,12 +33,9 @@ func main() {
 
 	cfg := config.FromEnv()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	db, err := setupDB(ctx, cfg.DatabaseURL)
+	db, err := setupDB(cfg.DatabaseURL)
 	if err != nil {
-		slog.Error("failed to setup database", slog.Any("err", err))
+		slog.Error("failed to setup database after retries", slog.Any("err", err))
 		os.Exit(1)
 	}
 	defer db.Close()
@@ -55,8 +54,9 @@ func main() {
 	}
 }
 
-// setupDB initializes the PostgreSQL connection pool using database/sql and pgx.
-func setupDB(ctx context.Context, dsn string) (*sql.DB, error) {
+// setupDB initializes the PostgreSQL pool and retries Ping using exponential backoff.
+func setupDB(dsn string) (*sql.DB, error) {
+	// Open does not establish connections immediately.
 	db, err := sql.Open("pgx", dsn)
 	if err != nil {
 		return nil, err
@@ -66,9 +66,30 @@ func setupDB(ctx context.Context, dsn string) (*sql.DB, error) {
 	db.SetMaxIdleConns(5)
 	db.SetConnMaxLifetime(1 * time.Hour)
 
-	if err := db.PingContext(ctx); err != nil {
-		_ = db.Close()
-		return nil, err
+	// Configure backoff: start ~2s, cap ~5s, total ~12s (~3 attempts)
+	bo := backoff.NewExponentialBackOff()
+	bo.InitialInterval = 2 * time.Second
+	bo.MaxInterval = 5 * time.Second
+	bo.Multiplier = 2
+	bo.RandomizationFactor = 0.1
+	bo.MaxElapsedTime = 12 * time.Second
+
+	operation := func() error {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		err := db.PingContext(ctx)
+		cancel()
+		return err
 	}
+
+	notify := func(err error, d time.Duration) {
+		slog.Warn("database ping failed, will retry", slog.Any("err", err), slog.Duration("next_in", d))
+	}
+
+	if err := backoff.RetryNotify(operation, bo, notify); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("database not available after retries: %w", err)
+	}
+
+	slog.Info("database connection established")
 	return db, nil
 }

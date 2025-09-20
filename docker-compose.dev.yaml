@@ -6,8 +6,6 @@ services:
   backend:
     image: backend:dev
 
-    ports:
-      - "8080:8080"   # host:container
     volumes:
       - $APPS_DIRECTORY/backend/cmd:/app/cmd
       - $APPS_DIRECTORY/backend/internal:/app/internal
