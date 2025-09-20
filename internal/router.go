@@ -3,9 +3,11 @@ package internal
 import (
 	"context"
 	"database/sql"
+	"log/slog"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"os"
 	"time"
 
 	httpx "backend/internal/httpx"
@@ -60,38 +62,13 @@ func NewHTTPServer(cfg config.Config, db *sql.DB) (http.Handler, error) {
 	})
 
 	// Catch-all must be last so it doesn't shadow /api/* and /swagger/*
-	// Use the Docker service name "website" so the backend can reach the Vite dev server via the shared Docker network.
-	r.Handle("/*", newReverseProxy("http://website:5173"))
+	target, err := url.Parse(cfg.WebsiteURL)
+	if err != nil {
+		slog.Error("parsing website url failed", slog.Any("err", err))
+		os.Exit(1)
+	}
+
+	r.Handle("/*", httputil.NewSingleHostReverseProxy(target))
 
 	return &httpServer{r}, nil
-}
-
-// newReverseProxy returns an HTTP handler that proxies requests to the targetURL.
-// This is used in development to forward unknown routes to the Vite dev server.
-func newReverseProxy(targetURL string) http.Handler {
-	u, err := url.Parse(targetURL)
-	if err != nil {
-		// If the target URL is invalid, fail fast in development.
-		panic("invalid reverse proxy target: " + err.Error())
-	}
-
-	proxy := httputil.NewSingleHostReverseProxy(u)
-
-	// Preserve the incoming path and query while swapping scheme/host to the target.
-	originalDirector := proxy.Director
-	proxy.Director = func(req *http.Request) {
-		originalDirector(req)
-		// Ensure Host header matches the target for some dev servers.
-		req.Host = u.Host
-		// Some servers are sensitive to an absent User-Agent; set empty if missing.
-		if _, ok := req.Header["User-Agent"]; !ok {
-			req.Header.Set("User-Agent", "")
-		}
-	}
-
-	proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
-		http.Error(w, "proxy error: "+err.Error(), http.StatusBadGateway)
-	}
-
-	return proxy
 }
